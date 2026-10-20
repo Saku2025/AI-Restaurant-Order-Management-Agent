@@ -1,0 +1,631 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pass Kitchen</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Figtree:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: three rails like a restaurant pass — menu board | conversation | kitchen ticket */
+:root {
+  --bg: #eef0ec;
+  --surface: #ffffff;
+  --ticket: #fffdf6;
+  --fg: #1d2420;
+  --muted: #66706a;
+  --line: #d8ddd6;
+  --accent: #2f6b4f;        /* basil */
+  --accent-ink: #ffffff;
+  --accent-soft: #e2eee6;
+  --heat: #d8641c;          /* flame for cooking */
+  --ok: #2f7d4a;
+  --warn: #b7791f;
+  --bad: #b83a32;
+  --bubble-ai: #f4f6f2;
+  --display: "Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --body: "Figtree", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --radius: 14px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121614; --surface: #1a201d; --ticket: #1f2522; --fg: #e8ece8; --muted: #95a199;
+    --line: #2d3531; --accent: #6fbf94; --accent-ink: #0d1a13; --accent-soft: #213229;
+    --heat: #f08a45; --ok: #6fcf8f; --warn: #e5b05a; --bad: #f07a70; --bubble-ai: #232a26;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #121614; --surface: #1a201d; --ticket: #1f2522; --fg: #e8ece8; --muted: #95a199;
+  --line: #2d3531; --accent: #6fbf94; --accent-ink: #0d1a13; --accent-soft: #213229;
+  --heat: #f08a45; --ok: #6fcf8f; --warn: #e5b05a; --bad: #f07a70; --bubble-ai: #232a26;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--fg);
+  font: 15px/1.5 var(--body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.shell { max-width: 1280px; margin: 0 auto; padding-block: 20px 24px; display: flex; flex-direction: column; gap: 18px; min-height: 100%; }
+
+header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.brand { display: flex; align-items: baseline; gap: 12px; }
+.brand h1 { font: 800 28px/1 var(--display); letter-spacing: -0.02em; margin: 0; }
+.brand h1 span { color: var(--accent); }
+.brand p { margin: 0; color: var(--muted); font-size: 13px; }
+.pill { font: 600 11px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; padding: 6px 10px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
+.pill .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+.pill.offline .dot { background: var(--bad); }
+
+.grid { display: grid; grid-template-columns: 280px minmax(0, 1fr) 300px; gap: 18px; flex: 1; min-height: 0; }
+
+.panel-title { font: 600 11px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 0 0 12px; display: flex; justify-content: space-between; }
+
+/* Menu board */
+.menu { display: flex; flex-direction: column; gap: 10px; }
+.dish { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; display: grid; grid-template-columns: 44px 1fr; gap: 4px 12px; align-items: center; transition: border-color .15s, transform .15s; }
+.dish:hover:not(.sold) { border-color: var(--accent); }
+.dish .mono { grid-row: span 2; width: 44px; height: 44px; border-radius: 12px; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; font: 800 20px/1 var(--display); }
+.dish h3 { margin: 0; font: 700 17px/1.1 var(--display); text-transform: capitalize; }
+.stock { font: 400 12px/1 var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.stock b { color: var(--fg); font-weight: 600; }
+.dish.sold { opacity: .6; }
+.dish.sold .mono { background: var(--line); color: var(--muted); }
+.dish.sold .stock { color: var(--bad); }
+.dish .actions { grid-column: 1 / -1; display: flex; gap: 8px; margin-top: 10px; align-items: center; }
+.stepper { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.stepper button { background: none; border: 0; width: 32px; height: 32px; font-size: 16px; }
+.stepper button:hover { background: var(--accent-soft); }
+.stepper output { min-width: 26px; text-align: center; font: 600 14px var(--mono); font-variant-numeric: tabular-nums; }
+.btn { border: 0; border-radius: 10px; padding: 8px 14px; font-weight: 600; background: var(--accent); color: var(--accent-ink); transition: filter .15s; }
+.btn:hover:not(:disabled) { filter: brightness(1.08); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn.ghost { background: transparent; color: var(--fg); border: 1px solid var(--line); }
+.dish .btn { flex: 1; }
+
+/* Conversation */
+.chat { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; display: flex; flex-direction: column; min-height: 520px; max-height: calc(100vh - 120px); min-width: 0; }
+.chat-head { padding: 14px 18px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 10px; }
+.avatar { width: 34px; height: 34px; border-radius: 50%; background: var(--accent); color: var(--accent-ink); display: grid; place-items: center; font: 800 15px var(--display); flex: none; }
+.chat-head strong { font: 700 15px var(--display); display: block; }
+.chat-head small { color: var(--muted); font-size: 12px; }
+.log { flex: 1; overflow-y: auto; padding: 18px; display: flex; flex-direction: column; gap: 10px; }
+.msg { max-width: 78%; padding: 10px 14px; border-radius: 16px; animation: rise .25s ease-out; overflow-wrap: anywhere; }
+.msg.ai { background: var(--bubble-ai); border-bottom-left-radius: 4px; align-self: flex-start; }
+.msg.user { background: var(--accent); color: var(--accent-ink); border-bottom-right-radius: 4px; align-self: flex-end; }
+.msg.system { align-self: center; max-width: 100%; background: none; color: var(--muted); font: 500 11px/1.3 var(--mono); letter-spacing: .08em; text-transform: uppercase; padding: 4px 0; }
+.msg.system.cook { color: var(--heat); }
+.msg.system.ok { color: var(--ok); }
+.msg.system.bad { color: var(--bad); }
+.typing { align-self: flex-start; display: flex; gap: 4px; padding: 12px 14px; background: var(--bubble-ai); border-radius: 16px; }
+.typing i { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); animation: blink 1.2s infinite; }
+.typing i:nth-child(2) { animation-delay: .2s; } .typing i:nth-child(3) { animation-delay: .4s; }
+
+.choices { display: flex; gap: 8px; padding: 0 18px 12px; flex-wrap: wrap; }
+.composer { display: flex; gap: 8px; padding: 12px; border-top: 1px solid var(--line); }
+.composer input { flex: 1; min-width: 0; border: 1px solid var(--line); background: var(--bg); color: var(--fg); border-radius: 12px; padding: 12px 14px; font: inherit; }
+.composer input::placeholder { color: var(--muted); }
+.suggest { display: flex; gap: 6px; padding: 0 18px 10px; flex-wrap: wrap; }
+.suggest button { background: none; border: 1px dashed var(--line); border-radius: 999px; padding: 4px 10px; font-size: 12px; color: var(--muted); }
+.suggest button:hover { border-color: var(--accent); color: var(--accent); }
+
+/* Kitchen ticket */
+.ticket { background: var(--ticket); border: 1px solid var(--line); border-radius: 6px; padding: 18px 18px 22px; font-family: var(--mono); font-size: 13px; position: relative; align-self: start;
+  -webkit-mask: radial-gradient(circle 6px at 50% 100%, transparent 98%, #000) 0 0 / 16px 100% repeat-x; mask: radial-gradient(circle 6px at 50% 100%, transparent 98%, #000) 0 0 / 16px 100% repeat-x; }
+.ticket h2 { font: 800 18px/1 var(--display); margin: 0 0 4px; letter-spacing: -0.01em; }
+.kot { color: var(--muted); font-size: 11px; display: flex; justify-content: space-between; }
+.rule { border: 0; border-top: 1px dashed var(--line); margin: 14px 0; }
+.line-item { display: flex; justify-content: space-between; font-size: 15px; font-weight: 600; text-transform: capitalize; font-variant-numeric: tabular-nums; }
+.line-item.empty { color: var(--muted); font-weight: 400; text-transform: none; font-size: 13px; }
+
+.stages { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0; }
+.stage { display: grid; grid-template-columns: 18px 1fr auto; gap: 10px; align-items: center; padding: 7px 0; position: relative; color: var(--muted); }
+.stage::before { content: ""; position: absolute; left: 8px; top: 24px; bottom: -7px; width: 2px; background: var(--line); }
+.stage:last-child::before { display: none; }
+.stage .node { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--line); background: var(--ticket); z-index: 1; }
+.stage.done { color: var(--fg); }
+.stage.done .node { background: var(--ok); border-color: var(--ok); }
+.stage.active { color: var(--fg); font-weight: 600; }
+.stage.active .node { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+.stage.active.cooking .node { border-color: var(--heat); box-shadow: 0 0 0 4px color-mix(in srgb, var(--heat) 20%, transparent); animation: pulse 1s infinite; }
+.stage.failed .node { background: var(--bad); border-color: var(--bad); }
+.stage .tag { font-size: 10px; letter-spacing: .06em; text-transform: uppercase; }
+
+.budgets { display: grid; gap: 8px; }
+.budget { display: flex; justify-content: space-between; align-items: center; }
+.budget span { color: var(--muted); font-size: 12px; }
+.pips { display: flex; gap: 4px; }
+.pips i { width: 10px; height: 10px; border-radius: 3px; background: var(--accent); }
+.pips i.used { background: var(--line); }
+
+.result { margin-top: 16px; padding: 12px; border-radius: 8px; text-align: center; font: 700 14px var(--display); letter-spacing: .02em; }
+.result.ok { background: color-mix(in srgb, var(--ok) 15%, transparent); color: var(--ok); }
+.result.bad { background: color-mix(in srgb, var(--bad) 15%, transparent); color: var(--bad); }
+.result .btn { margin-top: 10px; width: 100%; }
+
+.error { color: var(--bad); font-size: 13px; padding: 0 18px 8px; }
+
+.price { font: 600 13px var(--mono); color: var(--accent); font-variant-numeric: tabular-nums; }
+.dish-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+
+/* Order tray */
+.tray { margin-top: 14px; background: var(--surface); border: 1px dashed var(--line); border-radius: var(--radius); padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.tray-empty { color: var(--muted); font-size: 13px; margin: 0; }
+.tray-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.tray-list li { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; font-size: 14px; }
+.tray-list li span:first-child { text-transform: capitalize; }
+.tray-list .amt { font: 500 13px var(--mono); font-variant-numeric: tabular-nums; }
+.tray-list button { background: none; border: 0; color: var(--muted); width: 24px; height: 24px; border-radius: 6px; }
+.tray-list button:hover { color: var(--bad); background: var(--accent-soft); }
+.tray-total { display: flex; justify-content: space-between; font: 600 14px var(--mono); border-top: 1px solid var(--line); padding-top: 8px; font-variant-numeric: tabular-nums; }
+.tray-actions { display: flex; gap: 8px; }
+.tray-actions .btn:first-child { flex: 1; }
+
+/* Ticket line items + receipt */
+.items { display: flex; flex-direction: column; gap: 6px; }
+.line-item small { color: var(--muted); font-weight: 400; font-size: 12px; }
+.receipt { margin-top: 4px; font-variant-numeric: tabular-nums; }
+.receipt h3 { font: 800 15px var(--display); margin: 0 0 8px; letter-spacing: .04em; text-transform: uppercase; }
+.receipt .row { display: flex; justify-content: space-between; gap: 8px; padding: 2px 0; }
+.receipt .row span:first-child { text-transform: capitalize; }
+.receipt .row.sub { color: var(--muted); }
+.receipt .row.total { font-weight: 600; font-size: 16px; border-top: 1px dashed var(--line); margin-top: 6px; padding-top: 8px; }
+.receipt p { color: var(--muted); text-align: center; margin: 12px 0 0; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+/* Payment */
+.pay { margin: 0 18px 12px; padding: 14px; border: 1px solid var(--accent); border-radius: var(--radius); background: var(--accent-soft); display: flex; flex-direction: column; gap: 12px; animation: rise .25s ease-out; }
+.pay-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.pay-head strong { font: 700 16px var(--display); }
+.pay-amount { font: 600 20px var(--mono); font-variant-numeric: tabular-nums; }
+.methods { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.method { background: var(--surface); border: 1.5px solid var(--line); border-radius: 12px; padding: 10px 8px; display: flex; flex-direction: column; align-items: center; gap: 2px; transition: border-color .15s; }
+.method b { font: 700 15px var(--display); }
+.method small { color: var(--muted); font-size: 11px; }
+.method[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent); }
+.pay .btn { padding: 12px; font-size: 15px; }
+.pay-note { margin: 0; color: var(--muted); font-size: 11px; text-align: center; }
+.stamp { margin: 14px auto 0; width: fit-content; padding: 6px 14px; border: 2px solid var(--ok); color: var(--ok); border-radius: 6px; font: 800 18px var(--display); letter-spacing: .14em; transform: rotate(-4deg); animation: stamp .35s ease-out; }
+.stamp-meta { text-align: center; color: var(--muted); font-size: 11px; margin-top: 6px; }
+@keyframes stamp { from { transform: rotate(-4deg) scale(1.6); opacity: 0; } to { transform: rotate(-4deg) scale(1); opacity: 1; } }
+
+.msg { white-space: pre-line; }
+.msg.mono { font: 13px/1.5 var(--mono); white-space: pre; overflow-x: auto; max-width: 100%; }
+
+@keyframes rise { from { transform: translateY(6px); opacity: .3; } to { transform: none; opacity: 1; } }
+@keyframes blink { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
+@keyframes pulse { 50% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--heat) 10%, transparent); } }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+@media (max-width: 1020px) {
+  .grid { grid-template-columns: minmax(0, 1fr) 300px; }
+  .menu-col { grid-column: 1 / -1; }
+  .menu { flex-direction: row; overflow-x: auto; padding-bottom: 4px; }
+  .dish { min-width: 220px; flex: 1; }
+}
+@media (max-width: 720px) {
+  .grid { grid-template-columns: minmax(0, 1fr); }
+  .chat { max-height: none; min-height: 460px; }
+  .msg { max-width: 90%; }
+  .ticket { order: -1; }
+}
+</style>
+</head>
+<body>
+<div class="shell">
+  <header>
+    <div class="brand">
+      <h1>Pass<span>.</span>Kitchen</h1>
+      <p>AI order agent · LangGraph + Groq</p>
+    </div>
+    <span class="pill" id="conn"><span class="dot"></span><span id="conn-text">Connecting</span></span>
+  </header>
+
+  <main class="grid">
+    <section class="menu-col" aria-label="Menu">
+      <p class="panel-title"><span>Today's menu</span><span>Stock</span></p>
+      <div class="menu" id="menu"></div>
+      <div class="tray" id="tray">
+        <p class="panel-title" style="margin:0"><span>Your tray</span><span id="tray-count">0 items</span></p>
+        <p class="tray-empty" id="tray-empty">Add dishes from the menu, then place them as one order.</p>
+        <ul class="tray-list" id="tray-list"></ul>
+        <div class="tray-total" id="tray-total" hidden><span>Est. subtotal</span><span id="tray-sum"></span></div>
+        <div class="tray-actions">
+          <button class="btn" id="place" type="button" disabled>Place order</button>
+          <button class="btn ghost" id="clear" type="button" disabled>Clear</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="chat" aria-label="Conversation">
+      <div class="chat-head">
+        <div class="avatar">P</div>
+        <div><strong>Order assistant</strong><small id="hint">Tell me a dish and how many you want.</small></div>
+      </div>
+      <div class="log" id="log" aria-live="polite"></div>
+      <div class="choices" id="choices" hidden>
+        <button class="btn" id="accept">Accept available quantity</button>
+        <button class="btn ghost" id="reject">Reject, order something else</button>
+      </div>
+      <div class="pay" id="pay" hidden>
+        <div class="pay-head"><strong>Pay your bill</strong><span class="pay-amount" id="pay-amount"></span></div>
+        <div class="methods" role="group" aria-label="Payment method">
+          <button class="method" type="button" data-method="upi" aria-pressed="true"><b>UPI</b><small>GPay · PhonePe</small></button>
+          <button class="method" type="button" data-method="card" aria-pressed="false"><b>Card</b><small>Debit · Credit</small></button>
+          <button class="method" type="button" data-method="cash" aria-pressed="false"><b>Cash</b><small>Pay at counter</small></button>
+        </div>
+        <button class="btn" id="pay-btn" type="button">Pay</button>
+        <p class="pay-note">Demo payment. No card or bank details are collected.</p>
+      </div>
+      <div class="suggest" id="suggest">
+        <button data-text="2 pizzas and 1 burger">2 pizzas + 1 burger</button>
+        <button data-text="3 burgers, 5 pastas and a biryani">Mixed (partial)</button>
+        <button data-text="Show me the menu">Show menu</button>
+        <button data-text="Tell me a joke">Off-topic</button>
+      </div>
+      <p class="error" id="error" hidden></p>
+      <form class="composer" id="composer">
+        <input id="input" autocomplete="off" placeholder="e.g. I'd like 3 burgers" aria-label="Message">
+        <button class="btn" id="send" type="submit">Send</button>
+      </form>
+    </section>
+
+    <aside class="ticket" aria-label="Kitchen order ticket">
+      <h2>Kitchen ticket</h2>
+      <div class="kot"><span id="kot-no">KOT #----</span><span id="kot-time">--:--</span></div>
+      <hr class="rule">
+      <div class="items" id="items"><div class="line-item empty">No dishes yet</div></div>
+      <hr class="rule">
+      <ol class="stages" id="stages">
+        <li class="stage" data-stage="order"><span class="node"></span><span>Order taken</span><span class="tag"></span></li>
+        <li class="stage" data-stage="confirm"><span class="node"></span><span>Stock check</span><span class="tag"></span></li>
+        <li class="stage" data-stage="cook"><span class="node"></span><span>Cooking</span><span class="tag"></span></li>
+        <li class="stage" data-stage="serve"><span class="node"></span><span>Serving</span><span class="tag"></span></li>
+        <li class="stage" data-stage="bill"><span class="node"></span><span>Bill</span><span class="tag"></span></li>
+        <li class="stage" data-stage="pay"><span class="node"></span><span>Payment</span><span class="tag"></span></li>
+      </ol>
+      <div id="receipt" hidden></div>
+      <hr class="rule">
+      <div class="budgets">
+        <div class="budget"><span>Order attempts</span><div class="pips" id="pips-order"></div></div>
+        <div class="budget"><span>Cook retries</span><div class="pips" id="pips-cook"></div></div>
+        <div class="budget"><span>Serve retries</span><div class="pips" id="pips-serve"></div></div>
+      </div>
+      <div id="result"></div>
+    </aside>
+  </main>
+</div>
+
+<script>
+const MAX = { order: 3, cook: 2, serve: 2 };
+const STAGE_OF = {
+  show_menu: "order", get_order: "order", extract_order: "order",
+  order_confirm: "confirm", partial_decision: "confirm", unavailable: "confirm",
+  cook: "cook", retry_cook: "cook", serve: "serve", generate_bill: "bill", payment: "pay",
+};
+const ORDER = ["order", "confirm", "cook", "serve", "bill", "pay"];
+let payMethod = "upi";
+
+const $ = (id) => document.getElementById(id);
+const els = { log: $("log"), input: $("input"), send: $("send"), menu: $("menu"), choices: $("choices"), error: $("error") };
+const money = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", minimumFractionDigits: 2 });
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+let session = null, busy = false, waiting = null, done = false, lastStage = "order";
+let menuData = [];
+const qty = {};
+const tray = new Map(); // dish -> quantity
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+function addMsg(text, who = "ai", extra = "") {
+  const div = document.createElement("div");
+  div.className = `msg ${who} ${extra}`.trim();
+  div.textContent = text;
+  els.log.appendChild(div);
+  els.log.scrollTop = els.log.scrollHeight;
+}
+
+function showTyping(on) {
+  let t = els.log.querySelector(".typing");
+  if (on && !t) {
+    t = document.createElement("div");
+    t.className = "typing";
+    t.innerHTML = "<i></i><i></i><i></i>";
+    els.log.appendChild(t);
+    els.log.scrollTop = els.log.scrollHeight;
+  } else if (!on && t) t.remove();
+}
+
+/* ---------- Menu + tray ---------- */
+
+function priceOf(dish) {
+  return menuData.find((m) => m.dish === dish)?.price ?? 0;
+}
+
+function renderMenu(menu) {
+  menuData = menu;
+  els.menu.innerHTML = "";
+  for (const { dish, price, available } of menu) {
+    qty[dish] = Math.min(qty[dish] || 1, Math.max(available, 1));
+    const sold = available <= 0;
+    const card = document.createElement("article");
+    card.className = "dish" + (sold ? " sold" : "");
+    card.innerHTML = `
+      <div class="mono">${esc(dish[0].toUpperCase())}</div>
+      <div class="dish-top"><h3>${esc(dish)}</h3><span class="price">${money.format(price)}</span></div>
+      <div class="stock">${sold ? "Sold out" : `<b>${available}</b> left in kitchen`}</div>
+      <div class="actions">
+        <div class="stepper">
+          <button type="button" aria-label="Fewer ${esc(dish)}" data-d="-1">−</button>
+          <output>${qty[dish]}</output>
+          <button type="button" aria-label="More ${esc(dish)}" data-d="1">+</button>
+        </div>
+        <button class="btn add-btn" type="button">Add to tray</button>
+      </div>`;
+    const out = card.querySelector("output");
+    card.querySelectorAll(".stepper button").forEach((b) =>
+      b.addEventListener("click", () => {
+        qty[dish] = Math.max(1, Math.min(20, qty[dish] + Number(b.dataset.d)));
+        out.textContent = qty[dish];
+      }));
+    card.querySelector(".add-btn").addEventListener("click", () => {
+      tray.set(dish, (tray.get(dish) || 0) + qty[dish]);
+      renderTray();
+    });
+    els.menu.appendChild(card);
+  }
+  renderTray();
+}
+
+function renderTray() {
+  const list = $("tray-list");
+  list.innerHTML = "";
+  let sum = 0, count = 0;
+  for (const [dish, q] of tray) {
+    const amt = priceOf(dish) * q;
+    sum += amt; count += q;
+    const li = document.createElement("li");
+    li.innerHTML = `<span>${q} × ${esc(dish)}</span><span class="amt">${money.format(amt)}</span>
+      <button type="button" aria-label="Remove ${esc(dish)}">✕</button>`;
+    li.querySelector("button").addEventListener("click", () => { tray.delete(dish); renderTray(); });
+    list.appendChild(li);
+  }
+  $("tray-empty").hidden = tray.size > 0;
+  $("tray-total").hidden = tray.size === 0;
+  $("tray-sum").textContent = money.format(sum);
+  $("tray-count").textContent = `${count} item${count === 1 ? "" : "s"}`;
+  syncControls();
+}
+
+function placeTray() {
+  if (!tray.size) return;
+  const parts = [...tray].map(([dish, q]) => `${q} ${dish}`);
+  const text = "I want " + (parts.length > 1 ? parts.slice(0, -1).join(", ") + " and " + parts.at(-1) : parts[0]);
+  tray.clear();
+  renderTray();
+  send(text);
+}
+
+/* ---------- Ticket ---------- */
+
+function renderPips(id, left, max) {
+  $(id).innerHTML = Array.from({ length: max }, (_, i) => `<i class="${i < left ? "" : "used"}"></i>`).join("");
+}
+
+function setStage(stage, opts = {}) {
+  const idx = ORDER.indexOf(stage);
+  document.querySelectorAll(".stage").forEach((li, i) => {
+    li.classList.remove("done", "active", "cooking", "failed");
+    li.querySelector(".tag").textContent = "";
+    if (idx < 0) return;
+    if (i < idx || (i === idx && opts.complete)) li.classList.add("done");
+    else if (i === idx) {
+      li.classList.add(opts.failed ? "failed" : "active");
+      if (!opts.failed && (stage === "cook" || stage === "serve")) li.classList.add("cooking");
+      if (opts.tag) li.querySelector(".tag").textContent = opts.tag;
+    }
+  });
+}
+
+function renderItems(items) {
+  const box = $("items");
+  if (!items || !items.length) {
+    box.innerHTML = `<div class="line-item empty">No dishes yet</div>`;
+    return;
+  }
+  box.innerHTML = items.map((i) => {
+    const short = i.available < i.quantity && i.available >= 0 && waiting?.type === "partial";
+    const note = !i.price ? "<small>not on menu</small>" : short ? `<small>only ${i.available}</small>` : "";
+    return `<div class="line-item"><span>${esc(i.dish)} ${note}</span><span>× ${i.quantity}</span></div>`;
+  }).join("");
+}
+
+function renderReceipt(bill, payment) {
+  const box = $("receipt");
+  if (!bill) { box.hidden = true; box.innerHTML = ""; return; }
+  box.hidden = false;
+  box.innerHTML = `<hr class="rule"><div class="receipt">
+    <h3>Bill</h3>
+    ${bill.lines.map((l) => `<div class="row"><span>${l.quantity} × ${esc(l.dish)} <small>@ ${money.format(l.unit_price)}</small></span><span>${money.format(l.amount)}</span></div>`).join("")}
+    <div class="row sub" style="border-top:1px dashed var(--line);margin-top:6px;padding-top:6px"><span>Subtotal</span><span>${money.format(bill.subtotal)}</span></div>
+    <div class="row sub"><span>GST ${Math.round(bill.gst_rate * 100)}%</span><span>${money.format(bill.gst)}</span></div>
+    <div class="row total"><span>Total</span><span>${money.format(bill.total)}</span></div>
+    ${payment
+      ? `<div class="stamp">PAID</div>
+         <div class="stamp-meta">${esc(payment.method.toUpperCase())} · ${esc(payment.transaction_id)}</div>
+         <p>Thank you for dining with us</p>`
+      : `<p>Awaiting payment</p>`}
+  </div>`;
+}
+
+function renderTicket(data) {
+  renderItems(data.order.items);
+  renderReceipt(data.bill, data.payment);
+  if (waiting?.type === "payment") {
+    $("pay-amount").textContent = money.format(waiting.amount);
+    setStage("pay", { tag: "due" });
+  }
+  renderPips("pips-order", data.budgets.order, MAX.order);
+  renderPips("pips-cook", data.budgets.cook, MAX.cook);
+  renderPips("pips-serve", data.budgets.serve, MAX.serve);
+
+  const res = $("result");
+  res.innerHTML = "";
+  if (data.done) {
+    const ok = data.final_result === "ORDER_COMPLETED";
+    res.innerHTML = `<div class="result ${ok ? "ok" : "bad"}">${ok ? "PAID · ORDER COMPLETE" : "ORDER FAILED"}
+      <button class="btn" id="again" type="button">Start a new order</button></div>`;
+    $("again").addEventListener("click", start);
+    setStage(ok ? "pay" : lastStage, ok ? { complete: true } : { failed: true });
+  }
+}
+
+async function playSteps(data) {
+  for (const step of data.steps) {
+    const stage = STAGE_OF[step.node];
+    if (stage) {
+      lastStage = stage;
+      const tag = { COOK_FAILED: "retry", SERVE_FAILED: "dropped", PARTIAL: "partial", NOT_AVAILABLE: "none" }[step.status] || "";
+      setStage(stage, { tag });
+    }
+    if (step.node === "cook" || step.node === "serve") {
+      const failed = /FAILED/.test(step.status);
+      addMsg(`${step.node === "cook" ? "Kitchen" : "Waiter"} · ${failed ? "failed" : "done"}`, "system", failed ? "bad" : (step.node === "cook" ? "cook" : "ok"));
+    }
+    if (step.node === "generate_bill") addMsg("Cashier · bill printed", "system", "ok");
+    if (step.node === "payment" && step.status === "PAID") addMsg("Cashier · payment received", "system", "ok");
+    for (const [n, text] of step.messages.entries()) {
+      if (!reduced) { showTyping(true); await sleep(["cook", "serve", "generate_bill", "payment"].includes(step.node) ? 650 : 280); showTyping(false); }
+      const mono = (step.node === "generate_bill" && n === 0) || step.status === "MENU_REQUESTED";
+      addMsg(text, "ai", mono ? "mono" : "");
+    }
+  }
+}
+
+/* ---------- Controls ---------- */
+
+function syncControls() {
+  const canOrder = !busy && !done && waiting?.type === "order";
+  els.input.disabled = busy || done || !waiting;
+  els.send.disabled = busy || done || !waiting;
+  els.choices.hidden = !(waiting?.type === "partial") || busy || done;
+  $("pay").hidden = !(waiting?.type === "payment") || done;
+  $("pay-btn").disabled = busy;
+  $("pay-btn").textContent = busy && waiting?.type === "payment" ? "Processing payment…"
+    : `Pay ${waiting?.amount != null ? money.format(waiting.amount) : ""} with ${payMethod.toUpperCase()}`;
+  $("suggest").hidden = !canOrder;
+  $("place").disabled = !canOrder || tray.size === 0;
+  $("clear").disabled = tray.size === 0;
+  document.querySelectorAll(".add-btn").forEach((b) => {
+    b.disabled = done || b.closest(".dish").classList.contains("sold");
+  });
+  if (waiting?.type === "partial") {
+    const adj = (waiting.adjusted || []).map((i) => `${i.quantity} ${i.dish}`).join(", ");
+    $("accept").textContent = adj ? `Accept: ${adj}` : "Accept adjusted order";
+  }
+  $("hint").textContent = done ? "This order is closed."
+    : waiting?.type === "partial" ? "Accept the adjusted order or reject it."
+    : waiting?.type === "payment" ? "Choose a payment method and pay."
+    : "Order one or more dishes, or ask to see the menu.";
+  els.input.placeholder = waiting?.type === "partial" ? "Type 1 to accept, 2 to reject"
+    : waiting?.type === "payment" ? "Or type UPI, Card or Cash"
+    : "e.g. 2 pizzas and 3 burgers";
+}
+
+function setError(msg) {
+  els.error.hidden = !msg;
+  els.error.textContent = msg || "";
+}
+
+async function call(url, body) {
+  const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.detail || `Server error (${res.status})`);
+  return data;
+}
+
+async function apply(promise) {
+  busy = true; setError(""); syncControls(); showTyping(true);
+  try {
+    const data = await promise;
+    showTyping(false);
+    session = data.session_id;
+    waiting = data.waiting_for;
+    done = data.done;
+    renderTicket(data);
+    await playSteps(data);
+    renderTicket(data);
+    renderMenu(data.menu);
+    setConn(true);
+  } catch (e) {
+    showTyping(false);
+    const offline = e.message === "Failed to fetch";
+    setError(offline ? "Can't reach the server. Is uvicorn running?" : e.message);
+    if (offline) setConn(false);
+  } finally {
+    busy = false; syncControls();
+    if (!els.input.disabled) els.input.focus();
+  }
+}
+
+function send(text, label) {
+  text = text.trim();
+  if (!text || busy || !session || done) return;
+  addMsg(label || text, "user");
+  els.input.value = "";
+  apply(call(`/api/session/${session}/reply`, { text }));
+}
+
+function start() {
+  els.log.innerHTML = "";
+  done = false; waiting = null; lastStage = "order";
+  setStage("order");
+  renderReceipt(null);
+  renderItems([]);
+  $("result").innerHTML = "";
+  $("kot-no").textContent = "KOT #" + String(Math.floor(1000 + Math.random() * 9000));
+  $("kot-time").textContent = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  addMsg("Welcome to Pass Kitchen. Fill your tray from the menu, or just type your order.");
+  apply(call("/api/session"));
+}
+
+function setConn(ok) {
+  $("conn").classList.toggle("offline", !ok);
+  $("conn-text").textContent = ok ? "Kitchen open" : "Offline";
+}
+
+$("composer").addEventListener("submit", (e) => { e.preventDefault(); send(els.input.value); });
+$("accept").addEventListener("click", () => send("1", $("accept").textContent));
+$("reject").addEventListener("click", () => send("2", "Reject, I'll order something else"));
+$("suggest").addEventListener("click", (e) => { if (e.target.dataset.text) send(e.target.dataset.text); });
+$("place").addEventListener("click", placeTray);
+document.querySelectorAll(".method").forEach((b) => b.addEventListener("click", () => {
+  payMethod = b.dataset.method;
+  document.querySelectorAll(".method").forEach((m) => m.setAttribute("aria-pressed", String(m === b)));
+  syncControls();
+}));
+$("pay-btn").addEventListener("click", async () => {
+  if (busy || waiting?.type !== "payment") return;
+  busy = true; syncControls();
+  if (!reduced) await sleep(900); // brief "processing" moment
+  busy = false;
+  send(payMethod, `Pay ${money.format(waiting.amount)} with ${payMethod.toUpperCase()}`);
+});
+$("clear").addEventListener("click", () => { tray.clear(); renderTray(); });
+
+renderPips("pips-order", 3, 3); renderPips("pips-cook", 2, 2); renderPips("pips-serve", 2, 2);
+start();
+</script>
+</body>
+</html>
